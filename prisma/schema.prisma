@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id       String   @id @default(uuid())
+  email    String   @unique
+  username String   @unique
+  password String
+  avatar   String?
+  status   String   @default("OFFLINE")
+  lastSeen DateTime @default(now())
+  role     String   @default("USER")
+
+  sentMessages  Message[]      @relation("SentMessages")
+  memberships   ChatMember[]
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Chat {
+  id        String  @id @default(uuid())
+  name      String?
+  isGroup   Boolean @default(false)
+  creatorId String?
+
+  members  ChatMember[]
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ChatMember {
+  id       String   @id @default(uuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  chatId   String
+  chat     Chat     @relation(fields: [chatId], references: [id])
+  role     String   @default("MEMBER")
+  joinedAt DateTime @default(now())
+
+  @@unique([userId, chatId])
+}
+
+model Message {
+  id       String  @id @default(uuid())
+  content  String
+  type     String  @default("TEXT")
+  fileUrl  String?
+  fileName String?
+
+  senderId String
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
+
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id])
+
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies   Message[] @relation("MessageReplies")
+
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  title     String
+  content   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

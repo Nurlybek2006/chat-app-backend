@@ -1,4 +1,5 @@
 const messageService = require("./message.service");
+const { getIO } = require("../../config/socket");
 
 class MessageController {
   async sendMessage(req, res) {
@@ -10,6 +11,12 @@ class MessageController {
         chatId,
         req.body,
       );
+
+      const io = getIO();
+
+      io.to(`chat:${chatId}`).emit("new-message", {
+        message,
+      });
 
       return res.status(201).json({
         message,

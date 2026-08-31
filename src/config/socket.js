@@ -1,22 +1,24 @@
-const { Server } = require('socket.io');
-const { verifyToken } = require('../utils/jwt');
+const { Server } = require("socket.io");
+const { verifyToken } = require("../utils/jwt");
+const prisma = require("./prisma");
 
 let io;
 
 const initializeSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: '*',
-      methods: ['GET', 'POST'],
+      origin: "*",
+      methods: ["GET", "POST"],
     },
   });
 
+  // Socket authentication
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth.token;
 
       if (!token) {
-        return next(new Error('Authentication token is required'));
+        return next(new Error("Authentication token is required"));
       }
 
       const decoded = verifyToken(token);
@@ -27,43 +29,197 @@ const initializeSocket = (server) => {
 
       next();
     } catch (error) {
-      next(new Error('Invalid or expired token'));
+      next(new Error("Invalid or expired token"));
     }
   });
 
-  io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.user.userId}`);
+  // Connection
+  io.on("connection", async (socket) => {
+    const userId = socket.user.userId;
 
-    socket.join(`user:${socket.user.userId}`);
+    console.log(`Socket connected: ${userId} | ${socket.id}`);
 
-    socket.on('join-chat', (chatId) => {
-      socket.join(`chat:${chatId}`);
+    // Personal room
+    socket.join(`user:${userId}`);
 
-      console.log(
-        `User ${socket.user.userId} joined chat ${chatId}`
-      );
+    // ONLINE
+    try {
+      const userSockets = await io.in(`user:${userId}`).fetchSockets();
+
+      // First active socket
+      if (userSockets.length === 1) {
+        await prisma.user.update({
+          where: {
+            id: userId,
+          },
+
+          data: {
+            status: "ONLINE",
+          },
+        });
+
+        socket.broadcast.emit("user-online", {
+          userId,
+        });
+      }
+    } catch (error) {
+      console.error("Online status update error:", error);
+    }
+
+    // JOIN CHAT
+    socket.on("join-chat", async (chatId) => {
+      try {
+        if (!chatId) {
+          socket.emit("socket-error", {
+            message: "Chat ID is required",
+          });
+
+          return;
+        }
+
+        const membership = await prisma.chatMember.findUnique({
+          where: {
+            userId_chatId: {
+              userId,
+              chatId,
+            },
+          },
+        });
+
+        if (!membership) {
+          socket.emit("socket-error", {
+            message: "You are not a member of this chat",
+          });
+
+          return;
+        }
+
+        const roomName = `chat:${chatId}`;
+
+        if (socket.rooms.has(roomName)) {
+          socket.emit("joined-chat", {
+            chatId,
+          });
+
+          return;
+        }
+
+        await socket.join(roomName);
+
+        socket.emit("joined-chat", {
+          chatId,
+        });
+
+        console.log(`User ${userId} joined chat ${chatId}`);
+      } catch (error) {
+        console.error("Join chat error:", error);
+
+        socket.emit("socket-error", {
+          message: "Failed to join chat",
+        });
+      }
     });
 
-    socket.on('leave-chat', (chatId) => {
-      socket.leave(`chat:${chatId}`);
-    });
+    // LEAVE CHAT
+    socket.on("leave-chat", async (chatId) => {
+      if (!chatId) {
+        return;
+      }
 
-    socket.on('typing-start', (chatId) => {
-      socket.to(`chat:${chatId}`).emit('typing-start', {
+      await socket.leave(`chat:${chatId}`);
+
+      socket.emit("left-chat", {
         chatId,
-        userId: socket.user.userId,
       });
     });
 
-    socket.on('typing-stop', (chatId) => {
-      socket.to(`chat:${chatId}`).emit('typing-stop', {
-        chatId,
-        userId: socket.user.userId,
-      });
+    // TYPING START
+    socket.on("typing-start", async (chatId) => {
+      try {
+        if (!chatId) {
+          return;
+        }
+
+        const membership = await prisma.chatMember.findUnique({
+          where: {
+            userId_chatId: {
+              userId,
+              chatId,
+            },
+          },
+        });
+
+        if (!membership) {
+          return;
+        }
+
+        socket.to(`chat:${chatId}`).emit("typing-start", {
+          chatId,
+          userId,
+        });
+      } catch (error) {
+        console.error("Typing start error:", error);
+      }
     });
 
-    socket.on('disconnect', () => {
-      console.log(`Socket disconnected: ${socket.user.userId}`);
+    // TYPING STOP
+    socket.on("typing-stop", async (chatId) => {
+      try {
+        if (!chatId) {
+          return;
+        }
+
+        const membership = await prisma.chatMember.findUnique({
+          where: {
+            userId_chatId: {
+              userId,
+              chatId,
+            },
+          },
+        });
+
+        if (!membership) {
+          return;
+        }
+
+        socket.to(`chat:${chatId}`).emit("typing-stop", {
+          chatId,
+          userId,
+        });
+      } catch (error) {
+        console.error("Typing stop error:", error);
+      }
+    });
+
+    // DISCONNECT
+    socket.on("disconnect", async () => {
+      console.log(`Socket disconnected: ${userId} | ${socket.id}`);
+
+      try {
+        const remainingSockets = await io.in(`user:${userId}`).fetchSockets();
+
+        if (remainingSockets.length === 0) {
+          const now = new Date();
+
+          await prisma.user.update({
+            where: {
+              id: userId,
+            },
+
+            data: {
+              status: "OFFLINE",
+              lastSeen: now,
+            },
+          });
+
+          socket.broadcast.emit("user-offline", {
+            userId,
+            lastSeen: now,
+          });
+        }
+      } catch (error) {
+        console.error("Offline status update error:", error);
+      }
     });
   });
 
@@ -72,7 +228,7 @@ const initializeSocket = (server) => {
 
 const getIO = () => {
   if (!io) {
-    throw new Error('Socket.io is not initialized');
+    throw new Error("Socket.io is not initialized");
   }
 
   return io;

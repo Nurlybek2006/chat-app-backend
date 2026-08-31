@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="kk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Socket.io Test</title>
+  </head>
+
+  <body>
+    <h2>Socket.io Test</h2>
+
+    <input id="token" placeholder="JWT token" style="width: 700px" />
+
+    <br /><br />
+
+    <input id="chatId" placeholder="Chat ID" style="width: 500px" />
+
+    <br /><br />
+
+    <button id="connectBtn">Connect</button>
+
+    <button id="disconnectBtn">Disconnect</button>
+
+    <button id="joinBtn">Join Chat</button>
+
+    <button id="typingStartBtn">Typing Start</button>
+
+    <button id="typingStopBtn">Typing Stop</button>
+
+    <h3>Events:</h3>
+
+    <pre id="log"></pre>
+
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+
+    <script>
+      let socket = null;
+
+      const log = (text) => {
+        const logElement = document.getElementById("log");
+
+        logElement.textContent += text + "\n";
+      };
+
+      // CONNECT
+      document.getElementById("connectBtn").addEventListener("click", () => {
+        if (socket && socket.connected) {
+          log("Socket is already connected");
+          return;
+        }
+
+        const token = document.getElementById("token").value.trim();
+
+        if (!token) {
+          log("Token is required");
+          return;
+        }
+
+        socket = io("http://localhost:3000", {
+          auth: {
+            token,
+          },
+        });
+
+        socket.on("connect", () => {
+          log(`Connected: ${socket.id}`);
+        });
+
+        socket.on("connect_error", (error) => {
+          log(`Connection error: ${error.message}`);
+        });
+
+        socket.on("disconnect", () => {
+          log("Disconnected");
+        });
+
+        socket.on("joined-chat", (data) => {
+          log(`Successfully joined chat: ${data.chatId}`);
+        });
+
+        socket.on("left-chat", (data) => {
+          log(`Left chat: ${data.chatId}`);
+        });
+
+        socket.on("socket-error", (data) => {
+          log(`Socket error: ${data.message}`);
+        });
+
+        socket.on("new-message", (data) => {
+          log("NEW MESSAGE:");
+
+          log(JSON.stringify(data, null, 2));
+        });
+
+        socket.on("user-online", (data) => {
+          log(`USER ONLINE: ${data.userId}`);
+        });
+
+        socket.on("user-offline", (data) => {
+          log(`USER OFFLINE: ${data.userId} | lastSeen: ${data.lastSeen}`);
+        });
+
+        socket.on("typing-start", (data) => {
+          log(`Typing started: ${JSON.stringify(data)}`);
+        });
+
+        socket.on("typing-stop", (data) => {
+          log(`Typing stopped: ${JSON.stringify(data)}`);
+        });
+
+        socket.on("message-read", (data) => {
+          log(`MESSAGE READ: ${JSON.stringify(data)}`);
+        });
+
+        socket.on("messages-read", (data) => {
+          log(`MESSAGES READ: ${JSON.stringify(data)}`);
+        });
+
+        socket.on("new-notification", (data) => {
+          log(`NEW NOTIFICATION: ${JSON.stringify(data)}`);
+        });
+      });
+
+      // DISCONNECT
+      document.getElementById("disconnectBtn").addEventListener("click", () => {
+        if (!socket) {
+          return;
+        }
+
+        socket.disconnect();
+
+        socket = null;
+      });
+
+      // JOIN CHAT
+      document.getElementById("joinBtn").addEventListener("click", () => {
+        if (!socket || !socket.connected) {
+          log("First connect to Socket.io");
+          return;
+        }
+
+        const chatId = document.getElementById("chatId").value.trim();
+
+        if (!chatId) {
+          log("Chat ID is required");
+          return;
+        }
+
+        socket.emit("join-chat", chatId);
+      });
+
+      // TYPING START
+      document
+        .getElementById("typingStartBtn")
+        .addEventListener("click", () => {
+          if (!socket || !socket.connected) {
+            log("Socket is not connected");
+            return;
+          }
+
+          const chatId = document.getElementById("chatId").value.trim();
+
+          if (!chatId) {
+            log("Chat ID is required");
+            return;
+          }
+
+          socket.emit("typing-start", chatId);
+
+          log(`Typing start sent: ${chatId}`);
+        });
+
+      // TYPING STOP
+      document.getElementById("typingStopBtn").addEventListener("click", () => {
+        if (!socket || !socket.connected) {
+          log("Socket is not connected");
+          return;
+        }
+
+        const chatId = document.getElementById("chatId").value.trim();
+
+        if (!chatId) {
+          log("Chat ID is required");
+          return;
+        }
+
+        socket.emit("typing-stop", chatId);
+
+        log(`Typing stop sent: ${chatId}`);
+      });
+    </script>
+  </body>
+</html>

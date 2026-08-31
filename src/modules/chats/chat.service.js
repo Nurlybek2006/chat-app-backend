@@ -1,9 +1,9 @@
-const prisma = require('../../config/prisma');
+const prisma = require("../../config/prisma");
 
 class ChatService {
   async createPrivateChat(currentUserId, otherUserId) {
     if (currentUserId === otherUserId) {
-      throw new Error('You cannot create a private chat with yourself');
+      throw new Error("You cannot create a private chat with yourself");
     }
 
     const otherUser = await prisma.user.findUnique({
@@ -13,7 +13,7 @@ class ChatService {
     });
 
     if (!otherUser) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     const existingChats = await prisma.chat.findMany({
@@ -53,11 +53,11 @@ class ChatService {
           create: [
             {
               userId: currentUserId,
-              role: 'MEMBER',
+              role: "MEMBER",
             },
             {
               userId: otherUserId,
-              role: 'MEMBER',
+              role: "MEMBER",
             },
           ],
         },
@@ -88,24 +88,17 @@ class ChatService {
     const { name, memberIds } = data;
 
     if (!name || name.trim().length < 1) {
-      throw new Error('Group name is required');
+      throw new Error("Group name is required");
     }
 
     if (!Array.isArray(memberIds)) {
-      throw new Error('memberIds must be an array');
+      throw new Error("memberIds must be an array");
     }
 
-    const uniqueMemberIds = [
-      ...new Set([
-        currentUserId,
-        ...memberIds,
-      ]),
-    ];
+    const uniqueMemberIds = [...new Set([currentUserId, ...memberIds])];
 
     if (uniqueMemberIds.length < 3) {
-      throw new Error(
-        'Group chat must contain at least 3 users'
-      );
+      throw new Error("Group chat must contain at least 3 users");
     }
 
     const users = await prisma.user.findMany({
@@ -120,7 +113,7 @@ class ChatService {
     });
 
     if (users.length !== uniqueMemberIds.length) {
-      throw new Error('One or more users were not found');
+      throw new Error("One or more users were not found");
     }
 
     const chat = await prisma.chat.create({
@@ -132,10 +125,7 @@ class ChatService {
         members: {
           create: uniqueMemberIds.map((userId) => ({
             userId,
-            role:
-              userId === currentUserId
-                ? 'ADMIN'
-                : 'MEMBER',
+            role: userId === currentUserId ? "ADMIN" : "MEMBER",
           })),
         },
       },
@@ -189,7 +179,7 @@ class ChatService {
 
         messages: {
           orderBy: {
-            createdAt: 'desc',
+            createdAt: "desc",
           },
           take: 1,
 
@@ -212,11 +202,35 @@ class ChatService {
       },
 
       orderBy: {
-        updatedAt: 'desc',
+        updatedAt: "desc",
       },
     });
 
-    return chats;
+    const chatsWithUnreadCount = await Promise.all(
+      chats.map(async (chat) => {
+        const unreadCount = await prisma.message.count({
+          where: {
+            chatId: chat.id,
+
+            senderId: {
+              not: userId,
+            },
+
+            reads: {
+              none: {
+                userId,
+              },
+            },
+          },
+        });
+        return {
+          ...chat,
+          unreadCount,
+        };
+      }),
+    );
+
+    return chatsWithUnreadCount;
   }
 
   async getChatById(chatId, userId) {
@@ -230,7 +244,7 @@ class ChatService {
     });
 
     if (!membership) {
-      throw new Error('You are not a member of this chat');
+      throw new Error("You are not a member of this chat");
     }
 
     const chat = await prisma.chat.findUnique({
@@ -257,7 +271,7 @@ class ChatService {
     });
 
     if (!chat) {
-      throw new Error('Chat not found');
+      throw new Error("Chat not found");
     }
 
     return chat;

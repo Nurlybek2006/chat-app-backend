@@ -45,13 +45,17 @@ class MessageController {
   async getMessages(req, res) {
     try {
       const { chatId } = req.params;
-      const { page, limit } = req.query;
+
+      const { page, limit, search, type, senderId } = req.query;
 
       const result = await messageService.getMessages(
         req.user.userId,
         chatId,
         page,
         limit,
+        search,
+        type,
+        senderId,
       );
 
       return res.status(200).json(result);
@@ -61,7 +65,7 @@ class MessageController {
       });
     }
   }
-
+  
   async updateMessage(req, res) {
     try {
       const { messageId } = req.params;

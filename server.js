@@ -1,9 +1,12 @@
 require('dotenv').config();
 
+
 const http = require('http');
 
 const app = require('./src/app');
 const { initializeSocket } = require('./src/config/socket');
+
+require("./src/queues/notification.worker");
 
 const PORT = process.env.PORT || 3000;
 

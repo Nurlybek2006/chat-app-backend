@@ -1,35 +1,72 @@
-const { verifyToken } = require('../utils/jwt');
+const prisma =
+  require("../config/prisma");
 
-const authMiddleware = (req, res, next) => {
+const { verifyToken } =
+  require("../utils/jwt");
+
+const authMiddleware = async (
+  req,
+  res,
+  next,
+) => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader =
+      req.headers.authorization;
 
     if (!authHeader) {
       return res.status(401).json({
-        error: 'Authorization header is required',
+        error: "Authorization token required",
       });
     }
 
-    const parts = authHeader.split(' ');
+    const [type, token] =
+      authHeader.split(" ");
 
-    if (parts.length !== 2 || parts[0] !== 'Bearer') {
+    if (
+      type !== "Bearer" ||
+      !token
+    ) {
       return res.status(401).json({
-        error: 'Invalid authorization format',
+        error: "Invalid authorization format",
       });
     }
 
-    const token = parts[1];
+    const decoded =
+      verifyToken(token);
 
-    const decoded = verifyToken(token);
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: decoded.userId,
+        },
+
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          role: true,
+          status: true,
+        },
+      });
+
+    if (!user) {
+      return res.status(401).json({
+        error: "User not found",
+      });
+    }
 
     req.user = {
-      userId: decoded.userId,
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      status: user.status,
     };
 
     next();
   } catch (error) {
     return res.status(401).json({
-      error: 'Invalid or expired token',
+      error: "Invalid or expired token",
     });
   }
 };

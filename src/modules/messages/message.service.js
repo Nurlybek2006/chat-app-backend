@@ -80,7 +80,15 @@ class MessageService {
     return message;
   }
 
-  async getMessages(userId, chatId, page = 1, limit = 20) {
+  async getMessages(
+    userId,
+    chatId,
+    page = 1,
+    limit = 20,
+    search,
+    type,
+    senderId,
+  ) {
     const membership = await prisma.chatMember.findUnique({
       where: {
         userId_chatId: {
@@ -94,23 +102,32 @@ class MessageService {
       throw new Error("You are not a member of this chat");
     }
 
-    page = Math.max(Number(page) || 1, 1);
-    limit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const pageNumber = Math.max(Number(page) || 1, 1);
 
-    const skip = (page - 1) * limit;
+    const limitNumber = Math.min(Math.max(Number(limit) || 20, 1), 100);
+
+    const where = {
+      chatId,
+    };
+
+    if (search) {
+      where.content = {
+        contains: search,
+        mode: "insensitive",
+      };
+    }
+
+    if (type) {
+      where.type = type;
+    }
+
+    if (senderId) {
+      where.senderId = senderId;
+    }
 
     const [messages, total] = await Promise.all([
       prisma.message.findMany({
-        where: {
-          chatId,
-        },
-
-        orderBy: {
-          createdAt: "desc",
-        },
-
-        skip,
-        take: limit,
+        where,
 
         include: {
           sender: {
@@ -145,22 +162,29 @@ class MessageService {
             },
           },
         },
+
+        orderBy: {
+          createdAt: "desc",
+        },
+
+        skip: (pageNumber - 1) * limitNumber,
+
+        take: limitNumber,
       }),
 
       prisma.message.count({
-        where: {
-          chatId,
-        },
+        where,
       }),
     ]);
 
     return {
       messages,
+
       pagination: {
-        page,
-        limit,
+        page: pageNumber,
+        limit: limitNumber,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limitNumber),
       },
     };
   }

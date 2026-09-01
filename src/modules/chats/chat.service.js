@@ -276,6 +276,284 @@ class ChatService {
 
     return chat;
   }
+
+  async addMember(userId, chatId, memberId) {
+    const chat = await prisma.chat.findUnique({
+      where: {
+        id: chatId,
+      },
+    });
+
+    if (!chat) {
+      throw new Error("Chat not found");
+    }
+
+    if (!chat.isGroup) {
+      throw new Error("Members can only be added to group chats");
+    }
+
+    const requester = await prisma.chatMember.findUnique({
+      where: {
+        userId_chatId: {
+          userId,
+          chatId,
+        },
+      },
+    });
+
+    if (!requester) {
+      throw new Error("You are not a member of this chat");
+    }
+
+    if (requester.role !== "ADMIN") {
+      throw new Error("Only chat admin can add members");
+    }
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: memberId,
+      },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const existingMember = await prisma.chatMember.findUnique({
+      where: {
+        userId_chatId: {
+          userId: memberId,
+          chatId,
+        },
+      },
+    });
+
+    if (existingMember) {
+      throw new Error("User is already a member of this chat");
+    }
+
+    const member = await prisma.chatMember.create({
+      data: {
+        userId: memberId,
+        chatId,
+        role: "MEMBER",
+      },
+
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    return member;
+  }
+
+  async removeMember(userId, chatId, memberId) {
+    const requester = await prisma.chatMember.findUnique({
+      where: {
+        userId_chatId: {
+          userId,
+          chatId,
+        },
+      },
+    });
+
+    if (!requester) {
+      throw new Error("You are not a member of this chat");
+    }
+
+    if (requester.role !== "ADMIN") {
+      throw new Error("Only chat admin can remove members");
+    }
+
+    if (userId === memberId) {
+      throw new Error("Admin cannot remove himself");
+    }
+
+    const member = await prisma.chatMember.findUnique({
+      where: {
+        userId_chatId: {
+          userId: memberId,
+          chatId,
+        },
+      },
+    });
+
+    if (!member) {
+      throw new Error("Member not found");
+    }
+
+    await prisma.chatMember.delete({
+      where: {
+        userId_chatId: {
+          userId: memberId,
+          chatId,
+        },
+      },
+    });
+
+    return {
+      message: "Member removed",
+    };
+  }
+
+  async updateMemberRole(userId, chatId, memberId, role) {
+    const allowedRoles = ["ADMIN", "MEMBER"];
+
+    if (!allowedRoles.includes(role)) {
+      throw new Error("Invalid chat role");
+    }
+
+    const requester = await prisma.chatMember.findUnique({
+      where: {
+        userId_chatId: {
+          userId,
+          chatId,
+        },
+      },
+    });
+
+    if (!requester) {
+      throw new Error("You are not a member of this chat");
+    }
+
+    if (requester.role !== "ADMIN") {
+      throw new Error("Only chat admin can change member roles");
+    }
+
+    if (userId === memberId) {
+      throw new Error("Admin cannot change his own role");
+    }
+
+    const member = await prisma.chatMember.findUnique({
+      where: {
+        userId_chatId: {
+          userId: memberId,
+          chatId,
+        },
+      },
+    });
+
+    if (!member) {
+      throw new Error("Member not found");
+    }
+
+    return prisma.chatMember.update({
+      where: {
+        userId_chatId: {
+          userId: memberId,
+          chatId,
+        },
+      },
+
+      data: {
+        role,
+      },
+
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+  }
+
+  async updateGroup(userId, chatId, data) {
+    const chat = await prisma.chat.findUnique({
+      where: {
+        id: chatId,
+      },
+    });
+
+    if (!chat) {
+      throw new Error("Chat not found");
+    }
+
+    if (!chat.isGroup) {
+      throw new Error("Only group chats can be updated");
+    }
+
+    const membership = await prisma.chatMember.findUnique({
+      where: {
+        userId_chatId: {
+          userId,
+          chatId,
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new Error("You are not a member of this chat");
+    }
+
+    if (membership.role !== "ADMIN") {
+      throw new Error("Only chat admin can update group");
+    }
+
+    const { name } = data;
+
+    if (!name || !name.trim()) {
+      throw new Error("Group name is required");
+    }
+
+    return prisma.chat.update({
+      where: {
+        id: chatId,
+      },
+
+      data: {
+        name: name.trim(),
+      },
+    });
+  }
+
+  async getMembers(userId, chatId) {
+    const membership = await prisma.chatMember.findUnique({
+      where: {
+        userId_chatId: {
+          userId,
+          chatId,
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new Error("You are not a member of this chat");
+    }
+
+    const members = await prisma.chatMember.findMany({
+      where: {
+        chatId,
+      },
+
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+            status: true,
+            lastSeen: true,
+          },
+        },
+      },
+
+      orderBy: {
+        joinedAt: "asc",
+      },
+    });
+
+    return members;
+  }
 }
 
 module.exports = new ChatService();

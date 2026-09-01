@@ -1,4 +1,5 @@
 const prisma = require("../../config/prisma");
+const notificationQueue = require("../../queues/notification.queue");
 
 class NotificationService {
   async createNotification(data) {
@@ -121,7 +122,9 @@ class NotificationService {
             user: {
               select: {
                 id: true,
+                email: true,
                 username: true,
+                status: true,
               },
             },
           },
@@ -168,6 +171,14 @@ class NotificationService {
       });
 
       notifications.push(notification);
+
+      if (member.user.status === "OFFLINE" && member.user.email) {
+        await notificationQueue.add("send-email", {
+          email: member.user.email,
+          title: notification.title,
+          content: notification.content,
+        });
+      }
     }
 
     return notifications;

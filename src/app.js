@@ -5,12 +5,14 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
+const swaggerUi = require("swagger-ui-express");
 
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/users/user.routes");
 const chatRoutes = require("./modules/chats/chat.routes");
 const messageRoutes = require("./modules/messages/message.routes");
 const notificationRoutes = require("./modules/notifications/notification.routes");
+const swaggerSpec = require("./config/swagger");
 
 const app = express();
 
@@ -26,6 +28,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/api/chats", messageRoutes);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/api/notifications", notificationRoutes);
 

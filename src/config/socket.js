@@ -34,7 +34,7 @@ const initializeSocket = (server) => {
   });
 
   // Connection
-  io.on("connection", async (socket) => {
+  io.on("connection", (socket) => {
     const userId = socket.user.userId;
 
     console.log(`Socket connected: ${userId} | ${socket.id}`);
@@ -42,31 +42,10 @@ const initializeSocket = (server) => {
     // Personal room
     socket.join(`user:${userId}`);
 
-    // ONLINE
-    try {
-      const userSockets = await io.in(`user:${userId}`).fetchSockets();
-
-      // First active socket
-      if (userSockets.length === 1) {
-        await prisma.user.update({
-          where: {
-            id: userId,
-          },
-
-          data: {
-            status: "ONLINE",
-          },
-        });
-
-        socket.broadcast.emit("user-online", {
-          userId,
-        });
-      }
-    } catch (error) {
-      console.error("Online status update error:", error);
-    }
-
+    // =====================================================
     // JOIN CHAT
+    // =====================================================
+
     socket.on("join-chat", async (chatId) => {
       try {
         if (!chatId) {
@@ -120,20 +99,34 @@ const initializeSocket = (server) => {
       }
     });
 
+    // =====================================================
     // LEAVE CHAT
+    // =====================================================
+
     socket.on("leave-chat", async (chatId) => {
-      if (!chatId) {
-        return;
+      try {
+        if (!chatId) {
+          return;
+        }
+
+        await socket.leave(`chat:${chatId}`);
+
+        socket.emit("left-chat", {
+          chatId,
+        });
+      } catch (error) {
+        console.error("Leave chat error:", error);
+
+        socket.emit("socket-error", {
+          message: "Failed to leave chat",
+        });
       }
-
-      await socket.leave(`chat:${chatId}`);
-
-      socket.emit("left-chat", {
-        chatId,
-      });
     });
 
+    // =====================================================
     // TYPING START
+    // =====================================================
+
     socket.on("typing-start", async (chatId) => {
       try {
         if (!chatId) {
@@ -162,7 +155,10 @@ const initializeSocket = (server) => {
       }
     });
 
+    // =====================================================
     // TYPING STOP
+    // =====================================================
+
     socket.on("typing-stop", async (chatId) => {
       try {
         if (!chatId) {
@@ -191,7 +187,10 @@ const initializeSocket = (server) => {
       }
     });
 
+    // =====================================================
     // DISCONNECT
+    // =====================================================
+
     socket.on("disconnect", async () => {
       console.log(`Socket disconnected: ${userId} | ${socket.id}`);
 
@@ -221,6 +220,42 @@ const initializeSocket = (server) => {
         console.error("Offline status update error:", error);
       }
     });
+
+    // =====================================================
+    // ONLINE STATUS
+    // =====================================================
+    //
+    // Маңызды:
+    // Socket event listener-лер жоғарыда БІРІНШІ тіркелді.
+    // Сондықтан client connect болған бойда join-chat жіберсе де,
+    // event жоғалмайды.
+    //
+    // Бұл async функция connection handler-ді блоктамайды.
+
+    (async () => {
+      try {
+        const userSockets = await io.in(`user:${userId}`).fetchSockets();
+
+        // First active socket
+        if (userSockets.length === 1) {
+          await prisma.user.update({
+            where: {
+              id: userId,
+            },
+
+            data: {
+              status: "ONLINE",
+            },
+          });
+
+          socket.broadcast.emit("user-online", {
+            userId,
+          });
+        }
+      } catch (error) {
+        console.error("Online status update error:", error);
+      }
+    })();
   });
 
   return io;

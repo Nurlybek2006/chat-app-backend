@@ -1,6 +1,10 @@
 const express = require("express");
 const authController = require("./auth.controller");
 const authMiddleware = require("../../middleware/auth.middleware");
+const validate = require("../../middleware/validation.middleware");
+const { authLimiter } = require("../../middleware/rateLimit.middleware");
+
+const { registerValidation, loginValidation } = require("./auth.validation");
 
 const router = express.Router();
 
@@ -37,10 +41,13 @@ const router = express.Router();
  *       400:
  *         description: Registration error
  */
-router.post("/register", (req, res) => {
-  authController.register(req, res);
-});
-
+router.post(
+  "/register",
+  authLimiter,
+  registerValidation,
+  validate,
+  authController.register,
+);
 /**
  * @swagger
  * /api/auth/login:
@@ -70,9 +77,7 @@ router.post("/register", (req, res) => {
  *       400:
  *         description: Login failed
  */
-router.post("/login", (req, res) => {
-  authController.login(req, res);
-});
+router.post("/login", authLimiter, loginValidation, validate, authController.login);
 
 /**
  * @swagger
@@ -89,8 +94,6 @@ router.post("/login", (req, res) => {
  *       401:
  *         description: Unauthorized
  */
-router.get("/me", authMiddleware, (req, res) => {
-  authController.me(req, res);
-});
+router.get("/me", authMiddleware, authController.me);
 
 module.exports = router;

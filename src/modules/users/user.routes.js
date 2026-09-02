@@ -2,6 +2,12 @@ const express = require("express");
 
 const userController = require("./user.controller");
 const authMiddleware = require("../../middleware/auth.middleware");
+const validate = require("../../middleware/validation.middleware");
+
+const {
+  updateMeValidation,
+  searchUsersValidation,
+} = require("./users.validation");
 
 const router = express.Router();
 
@@ -24,7 +30,6 @@ const router = express.Router();
  *               properties:
  *                 user:
  *                   $ref: "#/components/schemas/User"
- *
  *       401:
  *         description: Unauthorized
  *         content:
@@ -32,6 +37,9 @@ const router = express.Router();
  *             schema:
  *               $ref: "#/components/schemas/Error"
  */
+router.get("/me", authMiddleware, (req, res) => {
+  userController.getProfile(req, res);
+});
 
 /**
  * @swagger
@@ -59,8 +67,17 @@ const router = express.Router();
  *       200:
  *         description: User profile updated
  *       400:
- *         description: Update error
+ *         description: Validation or update error
  */
+router.patch(
+  "/me",
+  authMiddleware,
+  updateMeValidation,
+  validate,
+  (req, res) => {
+    userController.updateProfile(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -77,21 +94,23 @@ const router = express.Router();
  *         required: true
  *         schema:
  *           type: string
+ *           minLength: 2
+ *           maxLength: 50
  *         example: bekzat
  *     responses:
  *       200:
  *         description: Search results
+ *       400:
+ *         description: Validation error
  */
-router.get("/me", authMiddleware, (req, res) => {
-  userController.getProfile(req, res);
-});
-
-router.patch("/me", authMiddleware, (req, res) => {
-  userController.updateProfile(req, res);
-});
-
-router.get("/search", authMiddleware, (req, res) => {
-  userController.searchUsers(req, res);
-});
+router.get(
+  "/search",
+  authMiddleware,
+  searchUsersValidation,
+  validate,
+  (req, res) => {
+    userController.searchUsers(req, res);
+  },
+);
 
 module.exports = router;

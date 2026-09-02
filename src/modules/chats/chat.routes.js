@@ -2,6 +2,17 @@ const express = require("express");
 
 const chatController = require("./chat.controller");
 const authMiddleware = require("../../middleware/auth.middleware");
+const validate = require("../../middleware/validation.middleware");
+
+const {
+  createPrivateChatValidation,
+  createGroupChatValidation,
+  chatIdValidation,
+  updateChatValidation,
+  addMemberValidation,
+  memberValidation,
+  updateMemberRoleValidation,
+} = require("./chats.validation");
 
 const router = express.Router();
 
@@ -30,7 +41,18 @@ const router = express.Router();
  *     responses:
  *       201:
  *         description: Private chat created
+ *       400:
+ *         description: Validation error
  */
+router.post(
+  "/private",
+  authMiddleware,
+  createPrivateChatValidation,
+  validate,
+  (req, res) => {
+    chatController.createPrivateChat(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -65,7 +87,18 @@ const router = express.Router();
  *     responses:
  *       201:
  *         description: Group chat created
+ *       400:
+ *         description: Validation error
  */
+router.post(
+  "/group",
+  authMiddleware,
+  createGroupChatValidation,
+  validate,
+  (req, res) => {
+    chatController.createGroupChat(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -89,6 +122,9 @@ const router = express.Router();
  *                   items:
  *                     $ref: "#/components/schemas/Chat"
  */
+router.get("/", authMiddleware, (req, res) => {
+  chatController.getChats(req, res);
+});
 
 /**
  * @swagger
@@ -109,61 +145,18 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Chat details
+ *       400:
+ *         description: Validation error
  */
-
-/**
- * @swagger
- * /api/chats/{chatId}:
- *   patch:
- *     summary: Update group chat
- *     tags:
- *       - Chats
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: chatId
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *             properties:
- *               name:
- *                 type: string
- *                 example: Backend Developers
- *     responses:
- *       200:
- *         description: Group updated
- */
-
-/**
- * @swagger
- * /api/chats/{chatId}/members:
- *   get:
- *     summary: Get chat members
- *     tags:
- *       - Chats
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: chatId
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Chat members
- */
+router.get(
+  "/:chatId",
+  authMiddleware,
+  chatIdValidation,
+  validate,
+  (req, res) => {
+    chatController.getChatById(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -196,7 +189,18 @@ const router = express.Router();
  *     responses:
  *       201:
  *         description: Member added
+ *       400:
+ *         description: Validation error
  */
+router.post(
+  "/:chatId/members",
+  authMiddleware,
+  addMemberValidation,
+  validate,
+  (req, res) => {
+    chatController.addMember(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -223,7 +227,18 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Member removed
+ *       400:
+ *         description: Validation error
  */
+router.delete(
+  "/:chatId/members/:memberId",
+  authMiddleware,
+  memberValidation,
+  validate,
+  (req, res) => {
+    chatController.removeMember(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -265,41 +280,93 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Member role updated
+ *       400:
+ *         description: Validation error
  */
-router.post("/private", authMiddleware, (req, res) => {
-  chatController.createPrivateChat(req, res);
-});
+router.patch(
+  "/:chatId/members/:memberId/role",
+  authMiddleware,
+  updateMemberRoleValidation,
+  validate,
+  (req, res) => {
+    chatController.updateMemberRole(req, res);
+  },
+);
 
-router.post("/group", authMiddleware, (req, res) => {
-  chatController.createGroupChat(req, res);
-});
+/**
+ * @swagger
+ * /api/chats/{chatId}:
+ *   patch:
+ *     summary: Update group chat
+ *     tags:
+ *       - Chats
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Backend Developers
+ *     responses:
+ *       200:
+ *         description: Group updated
+ *       400:
+ *         description: Validation error
+ */
+router.patch(
+  "/:chatId",
+  authMiddleware,
+  updateChatValidation,
+  validate,
+  (req, res) => {
+    chatController.updateGroup(req, res);
+  },
+);
 
-router.get("/", authMiddleware, (req, res) => {
-  chatController.getChats(req, res);
-});
-
-router.get("/:chatId", authMiddleware, (req, res) => {
-  chatController.getChatById(req, res);
-});
-
-router.post("/:chatId/members", authMiddleware, (req, res) => {
-  chatController.addMember(req, res);
-});
-
-router.delete("/:chatId/members/:memberId", authMiddleware, (req, res) => {
-  chatController.removeMember(req, res);
-});
-
-router.patch("/:chatId/members/:memberId/role", authMiddleware, (req, res) => {
-  chatController.updateMemberRole(req, res);
-});
-
-router.patch("/:chatId", authMiddleware, (req, res) => {
-  chatController.updateGroup(req, res);
-});
-
-router.get("/:chatId/members", authMiddleware, (req, res) => {
-  chatController.getMembers(req, res);
-});
+/**
+ * @swagger
+ * /api/chats/{chatId}/members:
+ *   get:
+ *     summary: Get chat members
+ *     tags:
+ *       - Chats
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: chatId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Chat members
+ *       400:
+ *         description: Validation error
+ */
+router.get(
+  "/:chatId/members",
+  authMiddleware,
+  chatIdValidation,
+  validate,
+  (req, res) => {
+    chatController.getMembers(req, res);
+  },
+);
 
 module.exports = router;

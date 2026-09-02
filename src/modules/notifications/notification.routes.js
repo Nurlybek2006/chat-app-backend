@@ -1,8 +1,11 @@
 const express = require("express");
 
 const authMiddleware = require("../../middleware/auth.middleware");
+const validate = require("../../middleware/validation.middleware");
 
 const notificationController = require("./notification.controller");
+
+const { notificationIdValidation } = require("./notifications.validation");
 
 const router = express.Router();
 
@@ -21,19 +24,22 @@ const router = express.Router();
  *         content:
  *           application/json:
  *             schema:
- *                type: object
- *                properties:
- *                  notifications:
- *                    type: array
- *                    items:
- *                      $ref: "#/components/schemas/Notification"
- *
+ *               type: object
+ *               properties:
+ *                 notifications:
+ *                   type: array
+ *                   items:
+ *                     $ref: "#/components/schemas/Notification"
  *       401:
  *         description: Unauthorized
  *         content:
  *           application/json:
- *              schema:
- *                $ref: "#/components/schemas/Error" */
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
+router.get("/", authMiddleware, (req, res) => {
+  notificationController.getNotifications(req, res);
+});
 
 /**
  * @swagger
@@ -48,6 +54,9 @@ const router = express.Router();
  *       200:
  *         description: Unread count
  */
+router.get("/unread-count", authMiddleware, (req, res) => {
+  notificationController.getUnreadCount(req, res);
+});
 
 /**
  * @swagger
@@ -62,6 +71,9 @@ const router = express.Router();
  *       200:
  *         description: All notifications marked as read
  */
+router.patch("/read-all", authMiddleware, (req, res) => {
+  notificationController.markAllAsRead(req, res);
+});
 
 /**
  * @swagger
@@ -82,7 +94,18 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Notification marked as read
+ *       400:
+ *         description: Validation error
  */
+router.patch(
+  "/:notificationId/read",
+  authMiddleware,
+  notificationIdValidation,
+  validate,
+  (req, res) => {
+    notificationController.markAsRead(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -103,26 +126,17 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Notification deleted
+ *       400:
+ *         description: Validation error
  */
-
-router.get("/", authMiddleware, (req, res) => {
-  notificationController.getNotifications(req, res);
-});
-
-router.get("/unread-count", authMiddleware, (req, res) => {
-  notificationController.getUnreadCount(req, res);
-});
-
-router.patch("/read-all", authMiddleware, (req, res) => {
-  notificationController.markAllAsRead(req, res);
-});
-
-router.patch("/:notificationId/read", authMiddleware, (req, res) => {
-  notificationController.markAsRead(req, res);
-});
-
-router.delete("/:notificationId", authMiddleware, (req, res) => {
-  notificationController.deleteNotification(req, res);
-});
+router.delete(
+  "/:notificationId",
+  authMiddleware,
+  notificationIdValidation,
+  validate,
+  (req, res) => {
+    notificationController.deleteNotification(req, res);
+  },
+);
 
 module.exports = router;

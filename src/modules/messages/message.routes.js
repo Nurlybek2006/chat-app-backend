@@ -3,6 +3,16 @@ const express = require("express");
 const messageController = require("./message.controller");
 const authMiddleware = require("../../middleware/auth.middleware");
 const upload = require("../../middleware/upload.middleware");
+const validate = require("../../middleware/validation.middleware");
+
+const {
+  sendMessageValidation,
+  getMessagesValidation,
+  updateMessageValidation,
+  messageIdValidation,
+  chatIdValidation,
+  sendFileValidation,
+} = require("./messages.validation");
 
 const router = express.Router();
 
@@ -49,12 +59,17 @@ const router = express.Router();
  *                 message:
  *                   $ref: "#/components/schemas/Message"
  *       400:
- *         description: Message send error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: "#/components/schemas/Error"
+ *         description: Message send or validation error
  */
+router.post(
+  "/:chatId/messages",
+  authMiddleware,
+  sendMessageValidation,
+  validate,
+  (req, res) => {
+    messageController.sendMessage(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -117,13 +132,20 @@ const router = express.Router();
  *                     $ref: "#/components/schemas/Message"
  *                 pagination:
  *                   $ref: "#/components/schemas/Pagination"
+ *       400:
+ *         description: Validation error
  *       403:
  *         description: Access denied
- *         content:
- *           application/json:
- *             schema:
- *               $ref: "#/components/schemas/Error"
  */
+router.get(
+  "/:chatId/messages",
+  authMiddleware,
+  getMessagesValidation,
+  validate,
+  (req, res) => {
+    messageController.getMessages(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -156,20 +178,18 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Message updated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   $ref: "#/components/schemas/Message"
  *       400:
- *         description: Message update error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: "#/components/schemas/Error"
+ *         description: Message update or validation error
  */
+router.patch(
+  "/messages/:messageId",
+  authMiddleware,
+  updateMessageValidation,
+  validate,
+  (req, res) => {
+    messageController.updateMessage(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -190,21 +210,18 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Message deleted
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Message deleted
  *       400:
- *         description: Delete error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: "#/components/schemas/Error"
+ *         description: Delete or validation error
  */
+router.delete(
+  "/messages/:messageId",
+  authMiddleware,
+  messageIdValidation,
+  validate,
+  (req, res) => {
+    messageController.deleteMessage(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -225,29 +242,18 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Message marked as read
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 messageId:
- *                   type: string
- *                   format: uuid
- *                 readBy:
- *                   type: string
- *                   format: uuid
- *                 readAt:
- *                   type: string
- *                   format: date-time
- *                 alreadyRead:
- *                   type: boolean
  *       400:
- *         description: Read operation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: "#/components/schemas/Error"
+ *         description: Read operation or validation error
  */
+router.patch(
+  "/messages/:messageId/read",
+  authMiddleware,
+  messageIdValidation,
+  validate,
+  (req, res) => {
+    messageController.markAsRead(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -268,33 +274,18 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Messages marked as read
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Messages marked as read
- *                 count:
- *                   type: integer
- *                   example: 3
- *                 messageIds:
- *                   type: array
- *                   items:
- *                     type: string
- *                     format: uuid
- *                 readAt:
- *                   type: string
- *                   format: date-time
- *                   nullable: true
  *       400:
- *         description: Read operation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: "#/components/schemas/Error"
+ *         description: Read operation or validation error
  */
+router.patch(
+  "/:chatId/read",
+  authMiddleware,
+  chatIdValidation,
+  validate,
+  (req, res) => {
+    messageController.markChatAsRead(req, res);
+  },
+);
 
 /**
  * @swagger
@@ -334,49 +325,20 @@ const router = express.Router();
  *     responses:
  *       201:
  *         description: File message sent
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   $ref: "#/components/schemas/Message"
  *       400:
- *         description: File upload error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: "#/components/schemas/Error"
+ *         description: File upload or validation error
  */
-
-router.post("/:chatId/messages", authMiddleware, (req, res) => {
-  messageController.sendMessage(req, res);
-});
-
-router.get("/:chatId/messages", authMiddleware, (req, res) => {
-  messageController.getMessages(req, res);
-});
-
-router.patch("/messages/:messageId", authMiddleware, (req, res) => {
-  messageController.updateMessage(req, res);
-});
-
-router.delete("/messages/:messageId", authMiddleware, (req, res) => {
-  messageController.deleteMessage(req, res);
-});
-
-router.patch("/messages/:messageId/read", authMiddleware, (req, res) => {
-  messageController.markAsRead(req, res);
-});
-
-router.patch("/:chatId/read", authMiddleware, (req, res) => {
-  messageController.markChatAsRead(req, res);
-});
-
 router.post(
   "/:chatId/messages/file",
   authMiddleware,
+
+  // Multer алдымен multipart/form-data-ны оқуы керек.
   upload.single("file"),
+
+  // Осыдан кейін req.file және req.body дайын болады.
+  sendFileValidation,
+  validate,
+
   (req, res) => {
     messageController.sendFile(req, res);
   },

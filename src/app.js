@@ -72,7 +72,15 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 // Static uploaded files
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// Static uploaded files
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "../uploads"), {
+    setHeaders: (res) => {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    },
+  }),
+);
 
 // Swagger
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));

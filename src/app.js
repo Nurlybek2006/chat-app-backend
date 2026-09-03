@@ -28,7 +28,13 @@ const app = express();
 app.disable("x-powered-by");
 
 // Security headers
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: {
+      policy: "cross-origin",
+    },
+  }),
+);
 
 // CORS
 const allowedOrigins = [
@@ -71,7 +77,6 @@ if (process.env.NODE_ENV !== "test") {
   app.use(morgan("dev"));
 }
 
-// Static uploaded files
 // Static uploaded files
 app.use(
   "/uploads",

@@ -1,6 +1,39 @@
 const chatService = require("./chat.service");
+const { getIO } = require("../../config/socket");
 
 class ChatController {
+  // --------------------------------
+  // Socket helper
+  // --------------------------------
+
+  emitChatAdded(userIds, chatId) {
+    try {
+      const io = getIO();
+
+      const uniqueUserIds = [...new Set(userIds)];
+
+      uniqueUserIds.forEach((userId) => {
+        if (!userId) {
+          return;
+        }
+
+        io.to(`user:${userId}`).emit("chat-added", {
+          chatId,
+        });
+      });
+    } catch (error) {
+      // Jest / API test кезінде Socket инициализацияланбауы мүмкін.
+      // Сол себепті API-ды құлатпаймыз.
+      if (process.env.NODE_ENV !== "test") {
+        console.error("chat-added socket error:", error.message);
+      }
+    }
+  }
+
+  // --------------------------------
+  // Create private chat
+  // --------------------------------
+
   async createPrivateChat(req, res) {
     try {
       const { userId } = req.body;
@@ -11,7 +44,12 @@ class ChatController {
         });
       }
 
-      const chat = await chatService.createPrivateChat(req.user.userId, userId);
+      const currentUserId = req.user.userId;
+
+      const chat = await chatService.createPrivateChat(currentUserId, userId);
+
+      // Екі user-ға да chat list жаңарту туралы айтамыз
+      this.emitChatAdded([currentUserId, userId], chat.id);
 
       return res.status(201).json({
         chat,
@@ -22,10 +60,21 @@ class ChatController {
       });
     }
   }
+
+  // --------------------------------
+  // Create group chat
+  // --------------------------------
 
   async createGroupChat(req, res) {
     try {
-      const chat = await chatService.createGroupChat(req.user.userId, req.body);
+      const currentUserId = req.user.userId;
+
+      const chat = await chatService.createGroupChat(currentUserId, req.body);
+
+      // Group-тағы барлық user-ға event жібереміз
+      const memberIds = chat.members?.map((member) => member.userId) || [];
+
+      this.emitChatAdded(memberIds, chat.id);
 
       return res.status(201).json({
         chat,
@@ -36,6 +85,10 @@ class ChatController {
       });
     }
   }
+
+  // --------------------------------
+  // Get chats
+  // --------------------------------
 
   async getChats(req, res) {
     try {
@@ -50,6 +103,10 @@ class ChatController {
       });
     }
   }
+
+  // --------------------------------
+  // Get chat by ID
+  // --------------------------------
 
   async getChatById(req, res) {
     try {
@@ -66,6 +123,10 @@ class ChatController {
       });
     }
   }
+
+  // --------------------------------
+  // Add group member
+  // --------------------------------
 
   async addMember(req, res) {
     try {
@@ -84,6 +145,10 @@ class ChatController {
         memberId,
       );
 
+      // Жаңа қосылған user-дың Sidebar-ында
+      // group бірден пайда болады
+      this.emitChatAdded([memberId], chatId);
+
       return res.status(201).json({
         member,
       });
@@ -93,6 +158,10 @@ class ChatController {
       });
     }
   }
+
+  // --------------------------------
+  // Remove member
+  // --------------------------------
 
   async removeMember(req, res) {
     try {
@@ -111,6 +180,10 @@ class ChatController {
       });
     }
   }
+
+  // --------------------------------
+  // Update member role
+  // --------------------------------
 
   async updateMemberRole(req, res) {
     try {
@@ -141,6 +214,10 @@ class ChatController {
     }
   }
 
+  // --------------------------------
+  // Update group
+  // --------------------------------
+
   async updateGroup(req, res) {
     try {
       const { chatId } = req.params;
@@ -159,6 +236,10 @@ class ChatController {
       });
     }
   }
+
+  // --------------------------------
+  // Get members
+  // --------------------------------
 
   async getMembers(req, res) {
     try {

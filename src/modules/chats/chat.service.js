@@ -19,14 +19,29 @@ class ChatService {
     const existingChats = await prisma.chat.findMany({
       where: {
         isGroup: false,
+
         members: {
           some: {
             userId: currentUserId,
           },
         },
       },
+
       include: {
-        members: true,
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                username: true,
+                avatar: true,
+                status: true,
+                lastSeen: true,
+              },
+            },
+          },
+        },
       },
     });
 

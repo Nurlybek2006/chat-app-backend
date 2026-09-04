@@ -189,6 +189,20 @@ class MessageService {
     };
   }
 
+  async getMessageById(messageId) {
+    const message = await prisma.message.findUnique({
+      where: {
+        id: messageId,
+      },
+    });
+
+    if (!message) {
+      throw new Error("Message not found");
+    }
+
+    return message;
+  }
+
   async updateMessage(userId, messageId, content) {
     if (!content || content.trim().length === 0) {
       throw new Error("Message content is required");

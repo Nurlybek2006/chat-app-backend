@@ -3,7 +3,7 @@ const { getIO } = require("../../config/socket");
 
 class ChatController {
   // --------------------------------
-  // Socket helper
+  // Socket helpers
   // --------------------------------
 
   emitChatAdded(userIds, chatId) {
@@ -22,10 +22,72 @@ class ChatController {
         });
       });
     } catch (error) {
-      // Jest / API test кезінде Socket инициализацияланбауы мүмкін.
-      // Сол себепті API-ды құлатпаймыз.
       if (process.env.NODE_ENV !== "test") {
         console.error("chat-added socket error:", error.message);
+      }
+    }
+  }
+
+  emitChatUpdated(userIds, chatId) {
+    try {
+      const io = getIO();
+
+      const uniqueUserIds = [...new Set(userIds)];
+
+      uniqueUserIds.forEach((userId) => {
+        if (!userId) {
+          return;
+        }
+
+        io.to(`user:${userId}`).emit("chat-updated", {
+          chatId,
+        });
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("chat-updated socket error:", error.message);
+      }
+    }
+  }
+
+  emitChatRemoved(userId, chatId) {
+    try {
+      const io = getIO();
+
+      if (!userId) {
+        return;
+      }
+
+      io.to(`user:${userId}`).emit("chat-removed", {
+        chatId,
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("chat-removed socket error:", error.message);
+      }
+    }
+  }
+
+  emitMemberRoleUpdated(userIds, chatId, memberId, role) {
+    try {
+      const io = getIO();
+
+      const uniqueUserIds = [...new Set(userIds)];
+
+      uniqueUserIds.forEach((userId) => {
+        if (!userId) {
+          return;
+        }
+
+        io.to(`user:${userId}`).emit("member-role-updated", {
+          chatId,
+          memberId,
+          role,
+        });
+      });
+    } catch (error) {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("member-role-updated socket error:", error.message);
       }
     }
   }
@@ -48,7 +110,6 @@ class ChatController {
 
       const chat = await chatService.createPrivateChat(currentUserId, userId);
 
-      // Екі user-ға да chat list жаңарту туралы айтамыз
       this.emitChatAdded([currentUserId, userId], chat.id);
 
       return res.status(201).json({
@@ -71,7 +132,6 @@ class ChatController {
 
       const chat = await chatService.createGroupChat(currentUserId, req.body);
 
-      // Group-тағы барлық user-ға event жібереміз
       const memberIds = chat.members?.map((member) => member.userId) || [];
 
       this.emitChatAdded(memberIds, chat.id);
@@ -145,9 +205,14 @@ class ChatController {
         memberId,
       );
 
-      // Жаңа қосылған user-дың Sidebar-ында
-      // group бірден пайда болады
       this.emitChatAdded([memberId], chatId);
+
+      // Қалған member-лердің chat data-сын да жаңартамыз
+      const members = await chatService.getMembers(req.user.userId, chatId);
+
+      const memberIds = members.map((item) => item.userId);
+
+      this.emitChatUpdated(memberIds, chatId);
 
       return res.status(201).json({
         member,
@@ -172,6 +237,16 @@ class ChatController {
         chatId,
         memberId,
       );
+
+      // Шығарылған user-дан chat жоғалады
+      this.emitChatRemoved(memberId, chatId);
+
+      // Қалған user-ларға members list жаңарғанын айтамыз
+      const members = await chatService.getMembers(req.user.userId, chatId);
+
+      const memberIds = members.map((member) => member.userId);
+
+      this.emitChatUpdated(memberIds, chatId);
 
       return res.status(200).json(result);
     } catch (error) {
@@ -204,6 +279,12 @@ class ChatController {
         role,
       );
 
+      const members = await chatService.getMembers(req.user.userId, chatId);
+
+      const memberIds = members.map((item) => item.userId);
+
+      this.emitMemberRoleUpdated(memberIds, chatId, memberId, role);
+
       return res.status(200).json({
         member,
       });
@@ -226,6 +307,12 @@ class ChatController {
       const chat = await chatService.updateGroup(req.user.userId, chatId, {
         name,
       });
+
+      const members = await chatService.getMembers(req.user.userId, chatId);
+
+      const memberIds = members.map((member) => member.userId);
+
+      this.emitChatUpdated(memberIds, chatId);
 
       return res.status(200).json({
         chat,

@@ -65,7 +65,7 @@ class MessageController {
       });
     }
   }
-  
+
   async updateMessage(req, res) {
     try {
       const { messageId } = req.params;
@@ -76,6 +76,12 @@ class MessageController {
         messageId,
         content,
       );
+
+      const io = getIO();
+
+      io.to(`chat:${message.chatId}`).emit("message-updated", {
+        message,
+      });
 
       return res.status(200).json({
         message,
@@ -91,10 +97,20 @@ class MessageController {
     try {
       const { messageId } = req.params;
 
+      // Delete алдында message-тің chatId-сын алу керек
+      const message = await messageService.getMessageById(messageId);
+
       const result = await messageService.deleteMessage(
         req.user.userId,
         messageId,
       );
+
+      const io = getIO();
+
+      io.to(`chat:${message.chatId}`).emit("message-deleted", {
+        messageId,
+        chatId: message.chatId,
+      });
 
       return res.status(200).json(result);
     } catch (error) {

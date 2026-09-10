@@ -1,4 +1,4 @@
-const prisma = require('../../config/prisma');
+const prisma = require("../../config/prisma");
 
 class UserService {
   async getProfile(userId) {
@@ -20,7 +20,7 @@ class UserService {
     });
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     return user;
@@ -37,7 +37,7 @@ class UserService {
       });
 
       if (existingUser && existingUser.id !== userId) {
-        throw new Error('Username already exists');
+        throw new Error("Username already exists");
       }
     }
 
@@ -83,13 +83,13 @@ class UserService {
               {
                 username: {
                   contains: query,
-                  mode: 'insensitive',
+                  mode: "insensitive",
                 },
               },
               {
                 email: {
                   contains: query,
-                  mode: 'insensitive',
+                  mode: "insensitive",
                 },
               },
             ],

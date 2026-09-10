@@ -1,11 +1,9 @@
-const userService = require('./user.service');
+const userService = require("./user.service");
 
 class UserController {
   async getProfile(req, res) {
     try {
-      const user = await userService.getProfile(
-        req.user.userId
-      );
+      const user = await userService.getProfile(req.user.userId);
 
       return res.status(200).json({
         user,
@@ -19,10 +17,7 @@ class UserController {
 
   async updateProfile(req, res) {
     try {
-      const user = await userService.updateProfile(
-        req.user.userId,
-        req.body
-      );
+      const user = await userService.updateProfile(req.user.userId, req.body);
 
       return res.status(200).json({
         user,
@@ -38,10 +33,7 @@ class UserController {
     try {
       const { q } = req.query;
 
-      const users = await userService.searchUsers(
-        q,
-        req.user.userId
-      );
+      const users = await userService.searchUsers(q, req.user.userId);
 
       return res.status(200).json({
         users,

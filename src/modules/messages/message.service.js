@@ -189,6 +189,7 @@ class MessageService {
     };
   }
 
+  
   async getMessageById(messageId) {
     const message = await prisma.message.findUnique({
       where: {
